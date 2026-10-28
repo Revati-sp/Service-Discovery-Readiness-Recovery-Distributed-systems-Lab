@@ -98,7 +98,6 @@ run "kubectl get events --field-selector involvedObject.name=$POD_A,reason=Unhea
 [[ "$(kubectl get pod "$POD_A" -o jsonpath='{.status.phase}')" == "Running" ]] || fail "$POD_A should still be Running"
 
 section "4d. READINESS - SERVICE ENDPOINTS EXCLUDE $POD_A"
-run kubectl get endpoints inventory-service -o wide
 run "$SLICE_CMD"
 
 section "4e. READINESS - TRAFFIC DURING FAILURE ($REQUESTS requests through the Service)"
@@ -112,7 +111,6 @@ run "kubectl exec $POD_A -- curl -s -X POST http://localhost:8080/readiness/rest
 run kubectl wait --for=condition=Ready "pod/$POD_A" --timeout=30s
 wait_slice "$POD_A" true
 run kubectl get pods -l app=inventory -o wide
-run kubectl get endpoints inventory-service -o wide
 run "$SLICE_CMD"
 
 section "4g. READINESS - BOTH REPLICAS RECEIVE TRAFFIC AGAIN"
@@ -131,8 +129,16 @@ run kubectl get pods -l app=inventory -o wide
 run kubectl get service inventory-service -o wide
 echo "Service identity before: $SVC_BEFORE"
 echo "Pod selected for deletion: $VICTIM ($(kubectl get pod "$VICTIM" -o jsonpath='{.status.podIP}'))"
+# Backend choice is random per request, so poll until the client's background
+# loop has logged at least one response from the Pod about to be deleted.
+for _ in $(seq 1 30); do
+  kubectl logs client --since-time="$LOG_START" | grep -q "$VICTIM" && break
+  sleep 1
+done
+kubectl logs client --since-time="$LOG_START" | grep -q "$VICTIM" || fail "client log never showed $VICTIM before deletion"
 
 section "5b. POD FAILURE - DELETE $VICTIM"
+DELETED_AT="$(date -u +%H:%M:%S)"
 run kubectl delete pod "$VICTIM"
 run kubectl get pods -l app=inventory -o wide
 
@@ -172,7 +178,7 @@ section "5f. CLIENT BACKGROUND LOOP ACROSS THE DELETION (kubectl logs client)"
 # Short pause so the client's 1-request-per-second loop records a few more
 # requests after the replacement became ready (no Kubernetes state to wait on here).
 sleep 5
-echo "Pod deleted: $VICTIM   Replacement: $NEW_POD"
+echo "Pod deleted: $VICTIM at $DELETED_AT (UTC)   Replacement: $NEW_POD"
 run "kubectl logs client --since-time=$LOG_START"
 
 section "DEMO COMPLETE - ALL CHECKS PASSED"

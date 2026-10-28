@@ -4,17 +4,16 @@
 ==================================================================
 
 $ kubectl version
-Client Version: v1.34.1
-Kustomize Version: v5.7.1
+Client Version: v1.37.1
+Kustomize Version: v5.8.1
 Server Version: v1.37.0
-Warning: version difference between client (1.34) and server (1.37) exceeds the supported minor version skew of +/-1
 
 $ kubectl config current-context
 kind-inventory-lab
 
 $ kubectl get nodes -o wide
-NAME                          STATUS   ROLES           AGE     VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION             CONTAINER-RUNTIME
-inventory-lab-control-plane   Ready    control-plane   2m40s   v1.37.0   172.23.0.2    <none>        Debian GNU/Linux 13 (trixie)   6.11.11-linuxkit (arm64)   containerd://2.3.4
+NAME                          STATUS   ROLES           AGE   VERSION   INTERNAL-IP   EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION             CONTAINER-RUNTIME
+inventory-lab-control-plane   Ready    control-plane   17m   v1.37.0   172.23.0.2    <none>        Debian GNU/Linux 13 (trixie)   6.11.11-linuxkit (arm64)   containerd://2.3.4
 
 ==================================================================
 1. DEPLOYMENT: 2 Inventory replicas, 1 Service, 1 client
@@ -29,17 +28,17 @@ inventory   2/2     2            2           4s    inventory    inventory:1.0   
 
 $ kubectl get pods -o wide
 NAME                         READY   STATUS    RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
-client                       1/1     Running   0          4s    10.244.0.10   inventory-lab-control-plane   <none>           <none>
-inventory-768b4699c8-ljkjc   1/1     Running   0          4s    10.244.0.12   inventory-lab-control-plane   <none>           <none>
-inventory-768b4699c8-q8qth   1/1     Running   0          4s    10.244.0.11   inventory-lab-control-plane   <none>           <none>
+client                       1/1     Running   0          4s    10.244.0.18   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-cz9lg   1/1     Running   0          4s    10.244.0.20   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-k2qrz   1/1     Running   0          4s    10.244.0.19   inventory-lab-control-plane   <none>           <none>
 
 $ kubectl get service inventory-service -o wide
-NAME                TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE   SELECTOR
-inventory-service   ClusterIP   10.96.222.158   <none>        8080/TCP   4s    app=inventory
+NAME                TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+inventory-service   ClusterIP   10.96.37.255   <none>        8080/TCP   4s    app=inventory
 
 $ kubectl get endpointslices -l kubernetes.io/service-name=inventory-service
 NAME                      ADDRESSTYPE   PORTS   ENDPOINTS                 AGE
-inventory-service-nq6gr   IPv4          8080    10.244.0.12,10.244.0.11   4s
+inventory-service-q5j6k   IPv4          8080    10.244.0.19,10.244.0.20   4s
 
 ==================================================================
 2. SERVICE DISCOVERY: the client only knows the Service DNS name
@@ -53,49 +52,49 @@ Server:		10.96.0.10
 Address:	10.96.0.10:53
 
 Name:	inventory-service.default.svc.cluster.local
-Address: 10.96.222.158
+Address: 10.96.37.255
 
 
 
 $ kubectl exec client -- curl -sv http://inventory-service:8080/inventory 2>&1 | grep -E 'Connected to|"pod"' | sed 's/, "items".*//'
-* Connected to inventory-service (10.96.222.158) port 8080
-{"service": "inventory", "pod": "inventory-768b4699c8-q8qth", "pod_ip": "10.244.0.11", "node": "inventory-lab-control-plane", "message": "Inventory request handled successfully"
+* Connected to inventory-service (10.96.37.255) port 8080
+{"service": "inventory", "pod": "inventory-768b4699c8-k2qrz", "pod_ip": "10.244.0.19", "node": "inventory-lab-control-plane", "message": "Inventory request handled successfully"
 
-Service ClusterIP: 10.96.222.158
-Inventory Pod IPs: 10.244.0.12 10.244.0.11
+Service ClusterIP: 10.96.37.255
+Inventory Pod IPs: 10.244.0.20 10.244.0.19
 -> curl connected to the Service ClusterIP (resolved from the name), not to a Pod IP.
 
 ==================================================================
 3. LOAD DISTRIBUTION: 20 requests to http://inventory-service:8080/inventory
 ==================================================================
-Inventory Pod A: inventory-768b4699c8-ljkjc
-Inventory Pod B: inventory-768b4699c8-q8qth
+Inventory Pod A: inventory-768b4699c8-cz9lg
+Inventory Pod B: inventory-768b4699c8-k2qrz
 
 $ kubectl exec client -- sh -c 'for i in $(seq 1 20); do printf "request %02d -> " $i; curl -s http://inventory-service:8080/inventory | grep -o "\"pod\": \"[^\"]*\""; done'
-request 01 -> "pod": "inventory-768b4699c8-ljkjc"
-request 02 -> "pod": "inventory-768b4699c8-q8qth"
-request 03 -> "pod": "inventory-768b4699c8-ljkjc"
-request 04 -> "pod": "inventory-768b4699c8-ljkjc"
-request 05 -> "pod": "inventory-768b4699c8-ljkjc"
-request 06 -> "pod": "inventory-768b4699c8-ljkjc"
-request 07 -> "pod": "inventory-768b4699c8-ljkjc"
-request 08 -> "pod": "inventory-768b4699c8-q8qth"
-request 09 -> "pod": "inventory-768b4699c8-ljkjc"
-request 10 -> "pod": "inventory-768b4699c8-q8qth"
-request 11 -> "pod": "inventory-768b4699c8-q8qth"
-request 12 -> "pod": "inventory-768b4699c8-ljkjc"
-request 13 -> "pod": "inventory-768b4699c8-ljkjc"
-request 14 -> "pod": "inventory-768b4699c8-ljkjc"
-request 15 -> "pod": "inventory-768b4699c8-q8qth"
-request 16 -> "pod": "inventory-768b4699c8-ljkjc"
-request 17 -> "pod": "inventory-768b4699c8-ljkjc"
-request 18 -> "pod": "inventory-768b4699c8-ljkjc"
-request 19 -> "pod": "inventory-768b4699c8-q8qth"
-request 20 -> "pod": "inventory-768b4699c8-q8qth"
+request 01 -> "pod": "inventory-768b4699c8-cz9lg"
+request 02 -> "pod": "inventory-768b4699c8-k2qrz"
+request 03 -> "pod": "inventory-768b4699c8-k2qrz"
+request 04 -> "pod": "inventory-768b4699c8-k2qrz"
+request 05 -> "pod": "inventory-768b4699c8-cz9lg"
+request 06 -> "pod": "inventory-768b4699c8-k2qrz"
+request 07 -> "pod": "inventory-768b4699c8-k2qrz"
+request 08 -> "pod": "inventory-768b4699c8-cz9lg"
+request 09 -> "pod": "inventory-768b4699c8-cz9lg"
+request 10 -> "pod": "inventory-768b4699c8-cz9lg"
+request 11 -> "pod": "inventory-768b4699c8-k2qrz"
+request 12 -> "pod": "inventory-768b4699c8-cz9lg"
+request 13 -> "pod": "inventory-768b4699c8-cz9lg"
+request 14 -> "pod": "inventory-768b4699c8-k2qrz"
+request 15 -> "pod": "inventory-768b4699c8-k2qrz"
+request 16 -> "pod": "inventory-768b4699c8-k2qrz"
+request 17 -> "pod": "inventory-768b4699c8-k2qrz"
+request 18 -> "pod": "inventory-768b4699c8-cz9lg"
+request 19 -> "pod": "inventory-768b4699c8-k2qrz"
+request 20 -> "pod": "inventory-768b4699c8-k2qrz"
 
 Requests handled per Pod:
-  13 inventory-768b4699c8-ljkjc
-   7 inventory-768b4699c8-q8qth
+   8 inventory-768b4699c8-cz9lg
+  12 inventory-768b4699c8-k2qrz
 -> Both replicas answered requests sent to the single Service name.
 
 ==================================================================
@@ -104,152 +103,142 @@ Requests handled per Pod:
 
 $ kubectl get pods -l app=inventory -o wide
 NAME                         READY   STATUS    RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
-inventory-768b4699c8-ljkjc   1/1     Running   0          6s    10.244.0.12   inventory-lab-control-plane   <none>           <none>
-inventory-768b4699c8-q8qth   1/1     Running   0          6s    10.244.0.11   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-cz9lg   1/1     Running   0          6s    10.244.0.20   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-k2qrz   1/1     Running   0          6s    10.244.0.19   inventory-lab-control-plane   <none>           <none>
 
 $ kubectl get endpointslices -l kubernetes.io/service-name=inventory-service -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name}{"  ip="}{.addresses[0]}{"  ready="}{.conditions.ready}{"\n"}{end}'
-inventory-768b4699c8-ljkjc  ip=10.244.0.12  ready=true
-inventory-768b4699c8-q8qth  ip=10.244.0.11  ready=true
+inventory-768b4699c8-k2qrz  ip=10.244.0.19  ready=true
+inventory-768b4699c8-cz9lg  ip=10.244.0.20  ready=true
 
 ==================================================================
-4b. READINESS - TRIGGER FAILURE ON inventory-768b4699c8-ljkjc ONLY
+4b. READINESS - TRIGGER FAILURE ON inventory-768b4699c8-cz9lg ONLY
 ==================================================================
 
-$ kubectl exec inventory-768b4699c8-ljkjc -- curl -s -X POST http://localhost:8080/readiness/fail
-{"pod": "inventory-768b4699c8-ljkjc", "ready": false}
+$ kubectl exec inventory-768b4699c8-cz9lg -- curl -s -X POST http://localhost:8080/readiness/fail
+{"pod": "inventory-768b4699c8-cz9lg", "ready": false}
 
-$ kubectl wait --for=condition=Ready=false pod/inventory-768b4699c8-ljkjc --timeout=30s
-pod/inventory-768b4699c8-ljkjc condition met
+$ kubectl wait --for=condition=Ready=false pod/inventory-768b4699c8-cz9lg --timeout=30s
+pod/inventory-768b4699c8-cz9lg condition met
 
 ==================================================================
-4c. READINESS - inventory-768b4699c8-ljkjc IS RUNNING BUT NOT READY (0/1, 0 restarts)
+4c. READINESS - inventory-768b4699c8-cz9lg IS RUNNING BUT NOT READY (0/1, 0 restarts)
 ==================================================================
 
 $ kubectl get pods -l app=inventory -o wide
 NAME                         READY   STATUS    RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
-inventory-768b4699c8-ljkjc   0/1     Running   0          8s    10.244.0.12   inventory-lab-control-plane   <none>           <none>
-inventory-768b4699c8-q8qth   1/1     Running   0          8s    10.244.0.11   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-cz9lg   0/1     Running   0          7s    10.244.0.20   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-k2qrz   1/1     Running   0          7s    10.244.0.19   inventory-lab-control-plane   <none>           <none>
 
-$ kubectl get pod inventory-768b4699c8-ljkjc -o jsonpath='phase={.status.phase}  ready={.status.containerStatuses[0].ready}  restarts={.status.containerStatuses[0].restartCount}'; echo
+$ kubectl get pod inventory-768b4699c8-cz9lg -o jsonpath='phase={.status.phase}  ready={.status.containerStatuses[0].ready}  restarts={.status.containerStatuses[0].restartCount}'; echo
 phase=Running  ready=false  restarts=0
 
-$ kubectl exec inventory-768b4699c8-ljkjc -- curl -s -o /dev/null -w 'GET /health -> %{http_code}\n' http://localhost:8080/health
+$ kubectl exec inventory-768b4699c8-cz9lg -- curl -s -o /dev/null -w 'GET /health -> %{http_code}\n' http://localhost:8080/health
 GET /health -> 200
 
-$ kubectl exec inventory-768b4699c8-ljkjc -- curl -s -o /dev/null -w 'GET /ready  -> %{http_code}\n' http://localhost:8080/ready
+$ kubectl exec inventory-768b4699c8-cz9lg -- curl -s -o /dev/null -w 'GET /ready  -> %{http_code}\n' http://localhost:8080/ready
 GET /ready  -> 503
 
-$ kubectl get events --field-selector involvedObject.name=inventory-768b4699c8-ljkjc,reason=Unhealthy -o custom-columns=TYPE:.type,REASON:.reason,MESSAGE:.message | head -3
+$ kubectl get events --field-selector involvedObject.name=inventory-768b4699c8-cz9lg,reason=Unhealthy -o custom-columns=TYPE:.type,REASON:.reason,MESSAGE:.message | head -3
 TYPE      REASON      MESSAGE
 Warning   Unhealthy   Readiness probe failed: HTTP probe failed with statuscode: 503
 
 ==================================================================
-4d. READINESS - SERVICE ENDPOINTS EXCLUDE inventory-768b4699c8-ljkjc
+4d. READINESS - SERVICE ENDPOINTS EXCLUDE inventory-768b4699c8-cz9lg
 ==================================================================
 
-$ kubectl get endpoints inventory-service -o wide
-Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
-NAME                ENDPOINTS          AGE
-inventory-service   10.244.0.11:8080   9s
-
 $ kubectl get endpointslices -l kubernetes.io/service-name=inventory-service -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name}{"  ip="}{.addresses[0]}{"  ready="}{.conditions.ready}{"\n"}{end}'
-inventory-768b4699c8-ljkjc  ip=10.244.0.12  ready=false
-inventory-768b4699c8-q8qth  ip=10.244.0.11  ready=true
+inventory-768b4699c8-k2qrz  ip=10.244.0.19  ready=true
+inventory-768b4699c8-cz9lg  ip=10.244.0.20  ready=false
 
 ==================================================================
 4e. READINESS - TRAFFIC DURING FAILURE (20 requests through the Service)
 ==================================================================
 
 $ kubectl exec client -- sh -c 'for i in $(seq 1 20); do printf "request %02d -> " $i; curl -s http://inventory-service:8080/inventory | grep -o "\"pod\": \"[^\"]*\""; done'
-request 01 -> "pod": "inventory-768b4699c8-q8qth"
-request 02 -> "pod": "inventory-768b4699c8-q8qth"
-request 03 -> "pod": "inventory-768b4699c8-q8qth"
-request 04 -> "pod": "inventory-768b4699c8-q8qth"
-request 05 -> "pod": "inventory-768b4699c8-q8qth"
-request 06 -> "pod": "inventory-768b4699c8-q8qth"
-request 07 -> "pod": "inventory-768b4699c8-q8qth"
-request 08 -> "pod": "inventory-768b4699c8-q8qth"
-request 09 -> "pod": "inventory-768b4699c8-q8qth"
-request 10 -> "pod": "inventory-768b4699c8-q8qth"
-request 11 -> "pod": "inventory-768b4699c8-q8qth"
-request 12 -> "pod": "inventory-768b4699c8-q8qth"
-request 13 -> "pod": "inventory-768b4699c8-q8qth"
-request 14 -> "pod": "inventory-768b4699c8-q8qth"
-request 15 -> "pod": "inventory-768b4699c8-q8qth"
-request 16 -> "pod": "inventory-768b4699c8-q8qth"
-request 17 -> "pod": "inventory-768b4699c8-q8qth"
-request 18 -> "pod": "inventory-768b4699c8-q8qth"
-request 19 -> "pod": "inventory-768b4699c8-q8qth"
-request 20 -> "pod": "inventory-768b4699c8-q8qth"
+request 01 -> "pod": "inventory-768b4699c8-k2qrz"
+request 02 -> "pod": "inventory-768b4699c8-k2qrz"
+request 03 -> "pod": "inventory-768b4699c8-k2qrz"
+request 04 -> "pod": "inventory-768b4699c8-k2qrz"
+request 05 -> "pod": "inventory-768b4699c8-k2qrz"
+request 06 -> "pod": "inventory-768b4699c8-k2qrz"
+request 07 -> "pod": "inventory-768b4699c8-k2qrz"
+request 08 -> "pod": "inventory-768b4699c8-k2qrz"
+request 09 -> "pod": "inventory-768b4699c8-k2qrz"
+request 10 -> "pod": "inventory-768b4699c8-k2qrz"
+request 11 -> "pod": "inventory-768b4699c8-k2qrz"
+request 12 -> "pod": "inventory-768b4699c8-k2qrz"
+request 13 -> "pod": "inventory-768b4699c8-k2qrz"
+request 14 -> "pod": "inventory-768b4699c8-k2qrz"
+request 15 -> "pod": "inventory-768b4699c8-k2qrz"
+request 16 -> "pod": "inventory-768b4699c8-k2qrz"
+request 17 -> "pod": "inventory-768b4699c8-k2qrz"
+request 18 -> "pod": "inventory-768b4699c8-k2qrz"
+request 19 -> "pod": "inventory-768b4699c8-k2qrz"
+request 20 -> "pod": "inventory-768b4699c8-k2qrz"
 
 Requests handled per Pod:
-  20 inventory-768b4699c8-q8qth
--> All 20 requests were served by inventory-768b4699c8-q8qth; unready inventory-768b4699c8-ljkjc received none.
+  20 inventory-768b4699c8-k2qrz
+-> All 20 requests were served by inventory-768b4699c8-k2qrz; unready inventory-768b4699c8-cz9lg received none.
 
 ==================================================================
-4f. READINESS - RESTORE inventory-768b4699c8-ljkjc
+4f. READINESS - RESTORE inventory-768b4699c8-cz9lg
 ==================================================================
 
-$ kubectl exec inventory-768b4699c8-ljkjc -- curl -s -X POST http://localhost:8080/readiness/restore
-{"pod": "inventory-768b4699c8-ljkjc", "ready": true}
+$ kubectl exec inventory-768b4699c8-cz9lg -- curl -s -X POST http://localhost:8080/readiness/restore
+{"pod": "inventory-768b4699c8-cz9lg", "ready": true}
 
-$ kubectl wait --for=condition=Ready pod/inventory-768b4699c8-ljkjc --timeout=30s
-pod/inventory-768b4699c8-ljkjc condition met
+$ kubectl wait --for=condition=Ready pod/inventory-768b4699c8-cz9lg --timeout=30s
+pod/inventory-768b4699c8-cz9lg condition met
 
 $ kubectl get pods -l app=inventory -o wide
 NAME                         READY   STATUS    RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
-inventory-768b4699c8-ljkjc   1/1     Running   0          12s   10.244.0.12   inventory-lab-control-plane   <none>           <none>
-inventory-768b4699c8-q8qth   1/1     Running   0          12s   10.244.0.11   inventory-lab-control-plane   <none>           <none>
-
-$ kubectl get endpoints inventory-service -o wide
-Warning: v1 Endpoints is deprecated in v1.33+; use discovery.k8s.io/v1 EndpointSlice
-NAME                ENDPOINTS                           AGE
-inventory-service   10.244.0.11:8080,10.244.0.12:8080   12s
+inventory-768b4699c8-cz9lg   1/1     Running   0          11s   10.244.0.20   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-k2qrz   1/1     Running   0          11s   10.244.0.19   inventory-lab-control-plane   <none>           <none>
 
 $ kubectl get endpointslices -l kubernetes.io/service-name=inventory-service -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name}{"  ip="}{.addresses[0]}{"  ready="}{.conditions.ready}{"\n"}{end}'
-inventory-768b4699c8-ljkjc  ip=10.244.0.12  ready=true
-inventory-768b4699c8-q8qth  ip=10.244.0.11  ready=true
+inventory-768b4699c8-k2qrz  ip=10.244.0.19  ready=true
+inventory-768b4699c8-cz9lg  ip=10.244.0.20  ready=true
 
 ==================================================================
 4g. READINESS - BOTH REPLICAS RECEIVE TRAFFIC AGAIN
 ==================================================================
 
 $ kubectl exec client -- sh -c 'for i in $(seq 1 20); do printf "request %02d -> " $i; curl -s http://inventory-service:8080/inventory | grep -o "\"pod\": \"[^\"]*\""; done'
-request 01 -> "pod": "inventory-768b4699c8-ljkjc"
-request 02 -> "pod": "inventory-768b4699c8-ljkjc"
-request 03 -> "pod": "inventory-768b4699c8-q8qth"
-request 04 -> "pod": "inventory-768b4699c8-ljkjc"
-request 05 -> "pod": "inventory-768b4699c8-q8qth"
-request 06 -> "pod": "inventory-768b4699c8-ljkjc"
-request 07 -> "pod": "inventory-768b4699c8-ljkjc"
-request 08 -> "pod": "inventory-768b4699c8-ljkjc"
-request 09 -> "pod": "inventory-768b4699c8-q8qth"
-request 10 -> "pod": "inventory-768b4699c8-ljkjc"
-request 11 -> "pod": "inventory-768b4699c8-ljkjc"
-request 12 -> "pod": "inventory-768b4699c8-q8qth"
-request 13 -> "pod": "inventory-768b4699c8-ljkjc"
-request 14 -> "pod": "inventory-768b4699c8-ljkjc"
-request 15 -> "pod": "inventory-768b4699c8-ljkjc"
-request 16 -> "pod": "inventory-768b4699c8-q8qth"
-request 17 -> "pod": "inventory-768b4699c8-q8qth"
-request 18 -> "pod": "inventory-768b4699c8-ljkjc"
-request 19 -> "pod": "inventory-768b4699c8-q8qth"
-request 20 -> "pod": "inventory-768b4699c8-q8qth"
+request 01 -> "pod": "inventory-768b4699c8-cz9lg"
+request 02 -> "pod": "inventory-768b4699c8-cz9lg"
+request 03 -> "pod": "inventory-768b4699c8-cz9lg"
+request 04 -> "pod": "inventory-768b4699c8-k2qrz"
+request 05 -> "pod": "inventory-768b4699c8-cz9lg"
+request 06 -> "pod": "inventory-768b4699c8-k2qrz"
+request 07 -> "pod": "inventory-768b4699c8-k2qrz"
+request 08 -> "pod": "inventory-768b4699c8-cz9lg"
+request 09 -> "pod": "inventory-768b4699c8-k2qrz"
+request 10 -> "pod": "inventory-768b4699c8-cz9lg"
+request 11 -> "pod": "inventory-768b4699c8-cz9lg"
+request 12 -> "pod": "inventory-768b4699c8-cz9lg"
+request 13 -> "pod": "inventory-768b4699c8-k2qrz"
+request 14 -> "pod": "inventory-768b4699c8-k2qrz"
+request 15 -> "pod": "inventory-768b4699c8-k2qrz"
+request 16 -> "pod": "inventory-768b4699c8-cz9lg"
+request 17 -> "pod": "inventory-768b4699c8-k2qrz"
+request 18 -> "pod": "inventory-768b4699c8-k2qrz"
+request 19 -> "pod": "inventory-768b4699c8-cz9lg"
+request 20 -> "pod": "inventory-768b4699c8-k2qrz"
 
 Requests handled per Pod:
-  12 inventory-768b4699c8-ljkjc
-   8 inventory-768b4699c8-q8qth
--> Restored Pod inventory-768b4699c8-ljkjc is serving Service traffic again (restart count unchanged).
+  10 inventory-768b4699c8-cz9lg
+  10 inventory-768b4699c8-k2qrz
+-> Restored Pod inventory-768b4699c8-cz9lg is serving Service traffic again (restart count unchanged).
 
 $ kubectl get pods -l app=inventory -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[0].ready,RESTARTS:.status.containerStatuses[0].restartCount
 NAME                         READY   RESTARTS
-inventory-768b4699c8-ljkjc   true    0
-inventory-768b4699c8-q8qth   true    0
+inventory-768b4699c8-cz9lg   true    0
+inventory-768b4699c8-k2qrz   true    0
 
-$ kubectl logs inventory-768b4699c8-ljkjc | grep -E 'listening|readiness'
-2026-10-28T07:02:42Z pod=inventory-768b4699c8-ljkjc listening on :8080 (pod_ip=10.244.0.12, node=inventory-lab-control-plane)
-2026-10-28T07:02:45Z pod=inventory-768b4699c8-ljkjc readiness set to FAILING (/ready now returns 503)
-2026-10-28T07:02:50Z pod=inventory-768b4699c8-ljkjc readiness RESTORED (/ready now returns 200)
+$ kubectl logs inventory-768b4699c8-cz9lg | grep -E 'listening|readiness'
+2026-10-28T07:17:56Z pod=inventory-768b4699c8-cz9lg listening on :8080 (pod_ip=10.244.0.20, node=inventory-lab-control-plane)
+2026-10-28T07:18:00Z pod=inventory-768b4699c8-cz9lg readiness set to FAILING (/ready now returns 503)
+2026-10-28T07:18:03Z pod=inventory-768b4699c8-cz9lg readiness RESTORED (/ready now returns 200)
 
 ==================================================================
 5a. POD FAILURE - BEFORE DELETION
@@ -257,26 +246,26 @@ $ kubectl logs inventory-768b4699c8-ljkjc | grep -E 'listening|readiness'
 
 $ kubectl get pods -l app=inventory -o wide
 NAME                         READY   STATUS    RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
-inventory-768b4699c8-ljkjc   1/1     Running   0          14s   10.244.0.12   inventory-lab-control-plane   <none>           <none>
-inventory-768b4699c8-q8qth   1/1     Running   0          14s   10.244.0.11   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-cz9lg   1/1     Running   0          12s   10.244.0.20   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-k2qrz   1/1     Running   0          12s   10.244.0.19   inventory-lab-control-plane   <none>           <none>
 
 $ kubectl get service inventory-service -o wide
-NAME                TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE   SELECTOR
-inventory-service   ClusterIP   10.96.222.158   <none>        8080/TCP   14s   app=inventory
-Service identity before: name=inventory-service clusterIP=10.96.222.158 uid=8ea8903a-fef7-41e3-a479-ae5392678cf1
-Pod selected for deletion: inventory-768b4699c8-q8qth (10.244.0.11)
+NAME                TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+inventory-service   ClusterIP   10.96.37.255   <none>        8080/TCP   12s   app=inventory
+Service identity before: name=inventory-service clusterIP=10.96.37.255 uid=4a2eb27e-f119-4e32-aaa6-d714778db254
+Pod selected for deletion: inventory-768b4699c8-k2qrz (10.244.0.19)
 
 ==================================================================
-5b. POD FAILURE - DELETE inventory-768b4699c8-q8qth
+5b. POD FAILURE - DELETE inventory-768b4699c8-k2qrz
 ==================================================================
 
-$ kubectl delete pod inventory-768b4699c8-q8qth
-pod "inventory-768b4699c8-q8qth" deleted from default namespace
+$ kubectl delete pod inventory-768b4699c8-k2qrz
+pod "inventory-768b4699c8-k2qrz" deleted from default namespace
 
 $ kubectl get pods -l app=inventory -o wide
-NAME                         READY   STATUS    RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
-inventory-768b4699c8-ljkjc   1/1     Running   0          16s   10.244.0.12   inventory-lab-control-plane   <none>           <none>
-inventory-768b4699c8-mzfks   0/1     Running   0          2s    10.244.0.13   inventory-lab-control-plane   <none>           <none>
+NAME                         READY   STATUS              RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
+inventory-768b4699c8-cz9lg   1/1     Running             0          13s   10.244.0.20   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-qxvcs   0/1     ContainerCreating   0          0s    <none>        inventory-lab-control-plane   <none>           <none>
 
 ==================================================================
 5c. POD FAILURE - DEPLOYMENT/REPLICASET CREATES A REPLACEMENT
@@ -287,91 +276,91 @@ Waiting for deployment "inventory" rollout to finish: 1 of 2 updated replicas ar
 deployment "inventory" successfully rolled out
 
 $ kubectl wait --for=condition=Ready pod -l app=inventory --timeout=120s
-pod/inventory-768b4699c8-ljkjc condition met
-pod/inventory-768b4699c8-mzfks condition met
+pod/inventory-768b4699c8-cz9lg condition met
+pod/inventory-768b4699c8-qxvcs condition met
 
 $ kubectl get pods -l app=inventory -o wide
 NAME                         READY   STATUS    RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
-inventory-768b4699c8-ljkjc   1/1     Running   0          18s   10.244.0.12   inventory-lab-control-plane   <none>           <none>
-inventory-768b4699c8-mzfks   1/1     Running   0          4s    10.244.0.13   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-cz9lg   1/1     Running   0          16s   10.244.0.20   inventory-lab-control-plane   <none>           <none>
+inventory-768b4699c8-qxvcs   1/1     Running   0          3s    10.244.0.21   inventory-lab-control-plane   <none>           <none>
 
 $ kubectl get deployment inventory
 NAME        READY   UP-TO-DATE   AVAILABLE   AGE
-inventory   2/2     2            2           18s
+inventory   2/2     2            2           16s
 
 $ kubectl get events --field-selector involvedObject.name=inventory-768b4699c8,reason=SuccessfulCreate --sort-by=.lastTimestamp -o custom-columns=REASON:.reason,OBJECT:.involvedObject.name,MESSAGE:.message | tail -1
-SuccessfulCreate   inventory-768b4699c8   Created pod: inventory-768b4699c8-mzfks
+SuccessfulCreate   inventory-768b4699c8   Created pod: inventory-768b4699c8-qxvcs
 
 ==================================================================
 5d. POD FAILURE - OLD VS NEW POD IDENTITY
 ==================================================================
-Pods before deletion : inventory-768b4699c8-ljkjc inventory-768b4699c8-q8qth
-Pods after deletion  : inventory-768b4699c8-ljkjc inventory-768b4699c8-mzfks
-Deleted Pod          : inventory-768b4699c8-q8qth
-Replacement Pod      : inventory-768b4699c8-mzfks (10.244.0.13)
+Pods before deletion : inventory-768b4699c8-cz9lg inventory-768b4699c8-k2qrz
+Pods after deletion  : inventory-768b4699c8-cz9lg inventory-768b4699c8-qxvcs
+Deleted Pod          : inventory-768b4699c8-k2qrz
+Replacement Pod      : inventory-768b4699c8-qxvcs (10.244.0.21)
 
-$ kubectl get pod inventory-768b4699c8-q8qth 2>&1 || true
-Error from server (NotFound): pods "inventory-768b4699c8-q8qth" not found
+$ kubectl get pod inventory-768b4699c8-k2qrz 2>&1 || true
+Error from server (NotFound): pods "inventory-768b4699c8-k2qrz" not found
 
 ==================================================================
 5e. POD FAILURE - SERVICE UNCHANGED, CLIENT STILL WORKS
 ==================================================================
 
 $ kubectl get service inventory-service -o wide
-NAME                TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE   SELECTOR
-inventory-service   ClusterIP   10.96.222.158   <none>        8080/TCP   18s   app=inventory
-Service identity before: name=inventory-service clusterIP=10.96.222.158 uid=8ea8903a-fef7-41e3-a479-ae5392678cf1
-Service identity after : name=inventory-service clusterIP=10.96.222.158 uid=8ea8903a-fef7-41e3-a479-ae5392678cf1
+NAME                TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+inventory-service   ClusterIP   10.96.37.255   <none>        8080/TCP   17s   app=inventory
+Service identity before: name=inventory-service clusterIP=10.96.37.255 uid=4a2eb27e-f119-4e32-aaa6-d714778db254
+Service identity after : name=inventory-service clusterIP=10.96.37.255 uid=4a2eb27e-f119-4e32-aaa6-d714778db254
 -> Same Service name, ClusterIP and UID. Client configuration was not modified.
 
 $ kubectl get endpointslices -l kubernetes.io/service-name=inventory-service -o jsonpath='{range .items[*].endpoints[*]}{.targetRef.name}{"  ip="}{.addresses[0]}{"  ready="}{.conditions.ready}{"\n"}{end}'
-inventory-768b4699c8-ljkjc  ip=10.244.0.12  ready=true
-inventory-768b4699c8-mzfks  ip=10.244.0.13  ready=true
+inventory-768b4699c8-cz9lg  ip=10.244.0.20  ready=true
+inventory-768b4699c8-qxvcs  ip=10.244.0.21  ready=true
 
 $ kubectl exec client -- sh -c 'for i in $(seq 1 20); do printf "request %02d -> " $i; curl -s http://inventory-service:8080/inventory | grep -o "\"pod\": \"[^\"]*\""; done'
-request 01 -> "pod": "inventory-768b4699c8-ljkjc"
-request 02 -> "pod": "inventory-768b4699c8-mzfks"
-request 03 -> "pod": "inventory-768b4699c8-ljkjc"
-request 04 -> "pod": "inventory-768b4699c8-ljkjc"
-request 05 -> "pod": "inventory-768b4699c8-mzfks"
-request 06 -> "pod": "inventory-768b4699c8-ljkjc"
-request 07 -> "pod": "inventory-768b4699c8-ljkjc"
-request 08 -> "pod": "inventory-768b4699c8-mzfks"
-request 09 -> "pod": "inventory-768b4699c8-mzfks"
-request 10 -> "pod": "inventory-768b4699c8-mzfks"
-request 11 -> "pod": "inventory-768b4699c8-ljkjc"
-request 12 -> "pod": "inventory-768b4699c8-ljkjc"
-request 13 -> "pod": "inventory-768b4699c8-ljkjc"
-request 14 -> "pod": "inventory-768b4699c8-ljkjc"
-request 15 -> "pod": "inventory-768b4699c8-ljkjc"
-request 16 -> "pod": "inventory-768b4699c8-mzfks"
-request 17 -> "pod": "inventory-768b4699c8-mzfks"
-request 18 -> "pod": "inventory-768b4699c8-mzfks"
-request 19 -> "pod": "inventory-768b4699c8-ljkjc"
-request 20 -> "pod": "inventory-768b4699c8-mzfks"
+request 01 -> "pod": "inventory-768b4699c8-qxvcs"
+request 02 -> "pod": "inventory-768b4699c8-cz9lg"
+request 03 -> "pod": "inventory-768b4699c8-qxvcs"
+request 04 -> "pod": "inventory-768b4699c8-cz9lg"
+request 05 -> "pod": "inventory-768b4699c8-cz9lg"
+request 06 -> "pod": "inventory-768b4699c8-cz9lg"
+request 07 -> "pod": "inventory-768b4699c8-cz9lg"
+request 08 -> "pod": "inventory-768b4699c8-cz9lg"
+request 09 -> "pod": "inventory-768b4699c8-qxvcs"
+request 10 -> "pod": "inventory-768b4699c8-qxvcs"
+request 11 -> "pod": "inventory-768b4699c8-qxvcs"
+request 12 -> "pod": "inventory-768b4699c8-qxvcs"
+request 13 -> "pod": "inventory-768b4699c8-qxvcs"
+request 14 -> "pod": "inventory-768b4699c8-cz9lg"
+request 15 -> "pod": "inventory-768b4699c8-cz9lg"
+request 16 -> "pod": "inventory-768b4699c8-qxvcs"
+request 17 -> "pod": "inventory-768b4699c8-qxvcs"
+request 18 -> "pod": "inventory-768b4699c8-cz9lg"
+request 19 -> "pod": "inventory-768b4699c8-qxvcs"
+request 20 -> "pod": "inventory-768b4699c8-cz9lg"
 
 Requests handled per Pod:
-  11 inventory-768b4699c8-ljkjc
-   9 inventory-768b4699c8-mzfks
--> Replacement inventory-768b4699c8-mzfks is serving requests through the unchanged Service.
+  10 inventory-768b4699c8-cz9lg
+  10 inventory-768b4699c8-qxvcs
+-> Replacement inventory-768b4699c8-qxvcs is serving requests through the unchanged Service.
 
 ==================================================================
 5f. CLIENT BACKGROUND LOOP ACROSS THE DELETION (kubectl logs client)
 ==================================================================
-Pod deleted: inventory-768b4699c8-q8qth   Replacement: inventory-768b4699c8-mzfks
+Pod deleted: inventory-768b4699c8-k2qrz at 07:18:07 (UTC)   Replacement: inventory-768b4699c8-qxvcs
 
-$ kubectl logs client --since-time=2026-10-28T07:02:53Z
-07:02:53 "pod": "inventory-768b4699c8-ljkjc"
-07:02:54 "pod": "inventory-768b4699c8-ljkjc"
-07:02:55 "pod": "inventory-768b4699c8-ljkjc"
-07:02:56 "pod": "inventory-768b4699c8-ljkjc"
-07:02:57 "pod": "inventory-768b4699c8-mzfks"
-07:02:58 "pod": "inventory-768b4699c8-mzfks"
-07:03:00 "pod": "inventory-768b4699c8-ljkjc"
-07:03:01 "pod": "inventory-768b4699c8-mzfks"
-07:03:02 "pod": "inventory-768b4699c8-mzfks"
-07:03:03 "pod": "inventory-768b4699c8-mzfks"
-07:03:04 "pod": "inventory-768b4699c8-mzfks"
+$ kubectl logs client --since-time=2026-10-28T07:18:06Z
+07:18:06 "pod": "inventory-768b4699c8-k2qrz"
+07:18:07 "pod": "inventory-768b4699c8-cz9lg"
+07:18:08 "pod": "inventory-768b4699c8-cz9lg"
+07:18:09 "pod": "inventory-768b4699c8-cz9lg"
+07:18:10 "pod": "inventory-768b4699c8-qxvcs"
+07:18:11 "pod": "inventory-768b4699c8-cz9lg"
+07:18:12 "pod": "inventory-768b4699c8-cz9lg"
+07:18:13 "pod": "inventory-768b4699c8-qxvcs"
+07:18:15 "pod": "inventory-768b4699c8-qxvcs"
+07:18:16 "pod": "inventory-768b4699c8-qxvcs"
+07:18:17 "pod": "inventory-768b4699c8-qxvcs"
 
 ==================================================================
 DEMO COMPLETE - ALL CHECKS PASSED
