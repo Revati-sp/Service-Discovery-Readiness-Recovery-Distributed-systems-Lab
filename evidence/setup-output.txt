@@ -1,0 +1,62 @@
+Switched to context "kind-inventory-lab".
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 379B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/python:3.12-alpine
+#2 DONE 0.5s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 59B done
+#3 DONE 0.0s
+
+#4 [1/5] FROM docker.io/library/python:3.12-alpine@sha256:5789aa194f757888f41fa3d48e14b6feaa1b57c0af0b56fcb1372d6474d3bff0
+#4 resolve docker.io/library/python:3.12-alpine@sha256:5789aa194f757888f41fa3d48e14b6feaa1b57c0af0b56fcb1372d6474d3bff0 done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 31B done
+#5 DONE 0.0s
+
+#6 [3/5] WORKDIR /app
+#6 CACHED
+
+#7 [4/5] COPY server.py .
+#7 CACHED
+
+#8 [2/5] RUN apk add --no-cache curl
+#8 CACHED
+
+#9 [5/5] RUN adduser -D -u 10001 inventory
+#9 CACHED
+
+#10 exporting to image
+#10 exporting layers done
+#10 exporting manifest sha256:32282a0c4130d83f98376b3e7a88bd3229f00a49e451d911bde76f3733b45d24 done
+#10 exporting config sha256:4b8a26f35f88f9da70cb81e443c7c513b4f35a4eb47ce3cfdecedd92c4376290 done
+#10 exporting attestation manifest sha256:0d0579e40d01429876b1ad3800a4fa843543f46f38f42de4fb3b17e5e85da015 done
+#10 exporting manifest list sha256:23a6c71215c02a286201d99be41cd5537c92d1b73d51f174df247d858a055b54 done
+#10 naming to docker.io/library/inventory:1.0 done
+#10 unpacking to docker.io/library/inventory:1.0 done
+#10 DONE 0.0s
+Image: "inventory:1.0" with ID "sha256:23a6c71215c02a286201d99be41cd5537c92d1b73d51f174df247d858a055b54" not yet present on node "inventory-lab-control-plane", loading...
+pod/client created
+deployment.apps/inventory created
+service/inventory-service created
+Waiting for deployment "inventory" rollout to finish: 0 of 2 updated replicas are available...
+Waiting for deployment "inventory" rollout to finish: 1 of 2 updated replicas are available...
+deployment "inventory" successfully rolled out
+pod/client condition met
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES          SELECTOR
+deployment.apps/inventory   2/2     2            2           4s    inventory    inventory:1.0   app=inventory
+
+NAME                             READY   STATUS    RESTARTS   AGE   IP            NODE                          NOMINATED NODE   READINESS GATES
+pod/client                       1/1     Running   0          4s    10.244.0.10   inventory-lab-control-plane   <none>           <none>
+pod/inventory-768b4699c8-ljkjc   1/1     Running   0          4s    10.244.0.12   inventory-lab-control-plane   <none>           <none>
+pod/inventory-768b4699c8-q8qth   1/1     Running   0          4s    10.244.0.11   inventory-lab-control-plane   <none>           <none>
+
+NAME                        TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE     SELECTOR
+service/inventory-service   ClusterIP   10.96.222.158   <none>        8080/TCP   4s      app=inventory
+service/kubernetes          ClusterIP   10.96.0.1       <none>        443/TCP    2m39s   <none>

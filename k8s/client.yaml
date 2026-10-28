@@ -1,0 +1,36 @@
+# Exactly ONE client Pod. It reaches Inventory only through the Service DNS name
+# "inventory-service" - never through individual Pod IPs or Pod names.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client
+  labels:
+    app: inventory-client
+spec:
+  containers:
+    - name: client
+      image: curlimages/curl:8.11.1   # provides sh, curl, seq, grep, sleep
+      env:
+        - name: INVENTORY_URL
+          value: http://inventory-service:8080/inventory
+      # Background loop: one request per second through the Service, so
+      # `kubectl logs client` shows continuous traffic (e.g. during Pod deletion).
+      # Each curl is a new process and a new TCP connection, so kube-proxy
+      # chooses a backend independently for every request.
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+          echo "client started; target=$INVENTORY_URL"
+          while true; do
+            ts=$(date -u +%H:%M:%S)
+            out=$(curl -s --max-time 2 "$INVENTORY_URL" | grep -o '"pod": "[^"]*"')
+            echo "$ts ${out:-REQUEST FAILED}"
+            sleep 1
+          done
+      resources:
+        requests:
+          cpu: 10m
+          memory: 16Mi
+        limits:
+          cpu: 100m
+          memory: 32Mi
